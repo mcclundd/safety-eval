@@ -1,0 +1,8 @@
+.env
+*.pyc
+__pycache__/
+results/responses_*.jsonl
+results/scores_*.csv
+.DS_Store
+venv/
+.venv/
