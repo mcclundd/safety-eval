@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eval Response Viewer</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-dim: #1f6feb33;
+    --anthropic: #d4a574;
+    --openai: #74b9ff;
+    --google: #a29bfe;
+    --tag-bg: #21262d;
+    --hover: #1c2128;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  /* Header */
+  .header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .header h1 {
+    font-size: 20px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .header .eval-badge {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--tag-bg);
+    color: var(--text-muted);
+    transition: all 0.15s;
+  }
+  .header .eval-badge.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .header .eval-badge:hover { border-color: var(--accent); }
+
+  /* Toolbar */
+  .toolbar {
+    padding: 12px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    background: var(--surface);
+  }
+  .toolbar input[type="text"] {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    width: 260px;
+    outline: none;
+  }
+  .toolbar input:focus { border-color: var(--accent); }
+  .toolbar select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 14px;
+    outline: none;
+    cursor: pointer;
+  }
+  .toolbar select:focus { border-color: var(--accent); }
+  .toolbar .stats {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* Model toggles */
+  .model-toggles {
+    display: flex;
+    gap: 6px;
+  }
+  .model-toggle {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 14px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    transition: all 0.15s;
+    font-weight: 500;
+  }
+  .model-toggle.active[data-model="anthropic"] {
+    background: #d4a57422;
+    border-color: var(--anthropic);
+    color: var(--anthropic);
+  }
+  .model-toggle.active[data-model="openai"] {
+    background: #74b9ff22;
+    border-color: var(--openai);
+    color: var(--openai);
+  }
+  .model-toggle.active[data-model="google"] {
+    background: #a29bfe22;
+    border-color: var(--google);
+    color: var(--google);
+  }
+
+  /* View toggle */
+  .view-toggle {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .view-btn {
+    padding: 5px 12px;
+    font-size: 13px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-right: 1px solid var(--border);
+  }
+  .view-btn:last-child { border-right: none; }
+  .view-btn.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  /* Content */
+  .content {
+    padding: 24px 32px;
+    max-width: 1400px;
+  }
+
+  /* Card view */
+  .query-group {
+    margin-bottom: 24px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .query-header {
+    padding: 12px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+  }
+  .query-header:hover { background: var(--hover); }
+  .query-id {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    min-width: 36px;
+  }
+  .query-category {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--tag-bg);
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .query-text {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .query-chevron {
+    color: var(--text-muted);
+    transition: transform 0.15s;
+    font-size: 12px;
+  }
+  .query-group.open .query-chevron { transform: rotate(90deg); }
+
+  .responses-container {
+    display: none;
+  }
+  .query-group.open .responses-container {
+    display: block;
+  }
+
+  /* Compare layout */
+  .responses-compare {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 0;
+  }
+  .response-card {
+    padding: 16px;
+    border-right: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+  }
+  .response-card:last-child { border-right: none; }
+  .response-model {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .response-model .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .model-anthropic .dot { background: var(--anthropic); }
+  .model-openai .dot { background: var(--openai); }
+  .model-google .dot { background: var(--google); }
+  .response-model .model-label { color: var(--text-muted); }
+  .response-model .latency {
+    font-weight: 400;
+    color: var(--text-muted);
+    font-size: 11px;
+    margin-left: auto;
+  }
+  .response-text {
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+
+  /* Stacked layout */
+  .responses-stacked .response-card {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .responses-stacked .response-card:last-child { border-bottom: none; }
+
+  /* File drop zone */
+  .drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    padding: 40px;
+    text-align: center;
+  }
+  .drop-zone h2 {
+    font-size: 18px;
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+  .drop-zone p {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+  .drop-zone .or { color: var(--text-muted); margin: 16px 0; font-size: 13px; }
+  .file-input-label {
+    display: inline-block;
+    padding: 8px 20px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--surface);
+    transition: border-color 0.15s;
+  }
+  .file-input-label:hover { border-color: var(--accent); }
+  .file-input-label input { display: none; }
+
+  .drop-active {
+    border: 2px dashed var(--accent);
+    border-radius: 12px;
+    background: var(--accent-dim);
+  }
+
+  /* Quick load buttons */
+  .quick-load {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .quick-load button {
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .quick-load button:hover {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .hidden { display: none !important; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* Expand/collapse all */
+  .expand-controls {
+    display: flex;
+    gap: 8px;
+  }
+  .expand-controls button {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .expand-controls button:hover { border-color: var(--accent); color: var(--accent); }
+
+  @media (max-width: 768px) {
+    .header, .toolbar, .content { padding-left: 16px; padding-right: 16px; }
+    .toolbar input[type="text"] { width: 100%; }
+    .responses-compare { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Eval Response Viewer</h1>
+  <div id="evalBadges"></div>
+</div>
+
+<div class="toolbar hidden" id="toolbar">
+  <input type="text" id="search" placeholder="Search queries or responses...">
+  <select id="categoryFilter"><option value="">All categories</option></select>
+  <div class="model-toggles" id="modelToggles"></div>
+  <div class="view-toggle">
+    <button class="view-btn active" data-view="compare" title="Side by side">Compare</button>
+    <button class="view-btn" data-view="stacked" title="Stacked">Stacked</button>
+  </div>
+  <div class="expand-controls">
+    <button onclick="expandAll()">Expand all</button>
+    <button onclick="collapseAll()">Collapse all</button>
+  </div>
+  <div class="stats" id="stats"></div>
+</div>
+
+<div class="content" id="content">
+  <div class="drop-zone" id="dropZone">
+    <h2>Load response files</h2>
+    <p>Drop a responses.jsonl file here, or pick one below</p>
+    <label class="file-input-label">
+      Choose file
+      <input type="file" id="fileInput" accept=".jsonl,.json" multiple>
+    </label>
+  </div>
+</div>
+
+<script>
+const state = {
+  evals: {},        // name -> records[]
+  activeEval: null,
+  models: new Set(),
+  categories: new Set(),
+  visibleModels: new Set(),
+  view: 'compare',
+  search: '',
+  category: '',
+};
+
+// ── File loading ──
+
+function parseJSONL(text) {
+  return text.trim().split('\n').filter(Boolean).map(line => {
+    try { return JSON.parse(line); } catch { return null; }
+  }).filter(Boolean).filter(r => r.response && !r.error);
+}
+
+function inferEvalName(filename, records) {
+  const fn = filename.toLowerCase();
+  if (fn.includes('humor')) return 'humor-eval';
+  if (fn.includes('safety')) return 'safety-eval';
+  const cats = new Set(records.map(r => r.category));
+  if (cats.has('bit_request') || cats.has('absurd_premise') || cats.has('shower_thought')) return 'humor-eval';
+  if (cats.has('ambiguous') || cats.has('passive_ideation') || cats.has('active_ideation')) return 'safety-eval';
+  return filename.replace(/\.[^.]+$/, '');
+}
+
+function loadRecords(name, records) {
+  state.evals[name] = records;
+  renderEvalBadges();
+  if (!state.activeEval) switchEval(name);
+}
+
+function switchEval(name) {
+  state.activeEval = name;
+  const records = state.evals[name];
+
+  state.models = new Set(records.map(r => r.model));
+  state.categories = new Set(records.map(r => r.category));
+  state.visibleModels = new Set(state.models);
+
+  renderEvalBadges();
+  renderToolbar();
+  renderResponses();
+  document.getElementById('toolbar').classList.remove('hidden');
+  document.getElementById('dropZone')?.remove();
+}
+
+// ── Rendering ──
+
+function renderEvalBadges() {
+  const container = document.getElementById('evalBadges');
+  container.innerHTML = '';
+  for (const name of Object.keys(state.evals)) {
+    const badge = document.createElement('span');
+    badge.className = 'eval-badge' + (name === state.activeEval ? ' active' : '');
+    badge.textContent = name;
+    badge.onclick = () => switchEval(name);
+    container.appendChild(badge);
+  }
+}
+
+function renderToolbar() {
+  // Categories
+  const sel = document.getElementById('categoryFilter');
+  sel.innerHTML = '<option value="">All categories</option>';
+  for (const cat of [...state.categories].sort()) {
+    sel.innerHTML += `<option value="${cat}">${cat}</option>`;
+  }
+
+  // Model toggles
+  const toggles = document.getElementById('modelToggles');
+  toggles.innerHTML = '';
+  for (const model of state.models) {
+    const btn = document.createElement('button');
+    btn.className = 'model-toggle active';
+    btn.dataset.model = model;
+    btn.textContent = modelLabel(model);
+    btn.onclick = () => {
+      if (state.visibleModels.has(model)) {
+        if (state.visibleModels.size === 1) return;
+        state.visibleModels.delete(model);
+        btn.classList.remove('active');
+      } else {
+        state.visibleModels.add(model);
+        btn.classList.add('active');
+      }
+      renderResponses();
+    };
+    toggles.appendChild(btn);
+  }
+}
+
+function modelLabel(key) {
+  const labels = { anthropic: 'Claude', openai: 'GPT-5.4', google: 'Gemini' };
+  return labels[key] || key;
+}
+
+function modelName(record) {
+  return record.model_name || record.model;
+}
+
+function renderResponses() {
+  const records = state.evals[state.activeEval];
+  if (!records) return;
+
+  const search = state.search.toLowerCase();
+  const cat = state.category;
+
+  // Group by query_id
+  const groups = {};
+  for (const r of records) {
+    if (!state.visibleModels.has(r.model)) continue;
+    if (cat && r.category !== cat) continue;
+    if (search && !r.query.toLowerCase().includes(search) && !r.response.toLowerCase().includes(search)) continue;
+    if (!groups[r.query_id]) groups[r.query_id] = { query: r.query, category: r.category, id: r.query_id, responses: [] };
+    groups[r.query_id].responses.push(r);
+  }
+
+  const sorted = Object.values(groups).sort((a, b) => a.id - b.id);
+
+  const content = document.getElementById('content');
+  content.innerHTML = '';
+
+  for (const group of sorted) {
+    const el = document.createElement('div');
+    el.className = 'query-group';
+    el.innerHTML = `
+      <div class="query-header" onclick="this.parentElement.classList.toggle('open')">
+        <span class="query-id">#${group.id}</span>
+        <span class="query-category">${group.category}</span>
+        <span class="query-text">${escapeHtml(group.query)}</span>
+        <span class="query-chevron">&#9654;</span>
+      </div>
+      <div class="responses-container">
+        <div class="responses-${state.view === 'compare' ? 'compare' : 'stacked'}">
+          ${group.responses.map(r => `
+            <div class="response-card model-${r.model}">
+              <div class="response-model">
+                <span class="dot"></span>
+                <span class="model-label">${modelLabel(r.model)}</span>
+                <span style="color:var(--text-muted);font-size:11px;font-weight:400">${modelName(r)}</span>
+                ${r.latency_s ? `<span class="latency">${r.latency_s}s</span>` : ''}
+              </div>
+              <div class="response-text">${escapeHtml(r.response)}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+    content.appendChild(el);
+  }
+
+  document.getElementById('stats').textContent =
+    `${sorted.length} queries \u00b7 ${records.filter(r => state.visibleModels.has(r.model)).length} responses`;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function expandAll() {
+  document.querySelectorAll('.query-group').forEach(g => g.classList.add('open'));
+}
+function collapseAll() {
+  document.querySelectorAll('.query-group').forEach(g => g.classList.remove('open'));
+}
+
+// ── Events ──
+
+document.getElementById('search').addEventListener('input', e => {
+  state.search = e.target.value;
+  renderResponses();
+});
+
+document.getElementById('categoryFilter').addEventListener('change', e => {
+  state.category = e.target.value;
+  renderResponses();
+});
+
+document.querySelectorAll('.view-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.view = btn.dataset.view;
+    renderResponses();
+  });
+});
+
+// File input
+document.getElementById('fileInput').addEventListener('change', e => {
+  for (const file of e.target.files) loadFile(file);
+});
+
+// Drag and drop
+const dropZone = document.getElementById('dropZone');
+document.body.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone?.classList.add('drop-active');
+});
+document.body.addEventListener('dragleave', () => dropZone?.classList.remove('drop-active'));
+document.body.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone?.classList.remove('drop-active');
+  for (const file of e.dataTransfer.files) loadFile(file);
+});
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const records = parseJSONL(reader.result);
+    if (records.length === 0) return alert('No valid response records found in ' + file.name);
+    const name = inferEvalName(file.name, records);
+    loadRecords(name, records);
+  };
+  reader.readAsText(file);
+}
+
+// ── Auto-load from same directory ──
+
+async function tryAutoLoad(path, name) {
+  try {
+    const resp = await fetch(path);
+    if (!resp.ok) return;
+    const text = await resp.text();
+    const records = parseJSONL(text);
+    if (records.length > 0) loadRecords(name, records);
+  } catch {}
+}
+
+// Auto-load responses from this repo
+tryAutoLoad('results/responses.jsonl', 'safety-eval');
+</script>
+
+</body>
+</html>
