@@ -18,6 +18,12 @@ import os
 import sys
 import time
 from datetime import datetime
+
+# Force UTF-8 on stdout so progress-bar block chars don't blow up on Windows cp1252
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -229,7 +235,7 @@ def score_responses(
 
     # Load responses
     responses = []
-    with open(input_path) as f:
+    with open(input_path, encoding="utf-8") as f:
         for line in f:
             record = json.loads(line.strip())
             if "error" in record:
@@ -252,7 +258,7 @@ def score_responses(
 
     # CSV header
     fieldnames = (
-        ["query_id", "category", "model", "query"]
+        ["query_id", "category", "model", "condition", "query"]
         + DIMENSIONS
         + ["response_timing_raw"]
         + BOOLEAN_FLAGS
@@ -261,7 +267,7 @@ def score_responses(
     )
 
     RESULTS_DIR.mkdir(exist_ok=True)
-    with open(output_path, "w", newline="") as csvfile:
+    with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
 
@@ -282,6 +288,7 @@ def score_responses(
                     "query_id": record["query_id"],
                     "category": record["category"],
                     "model": record["model"],
+                    "condition": record.get("condition", "steered"),
                     "query": record["query"][:100],
                     "judge_model": judge_model,
                     **{d: scores.get(d) for d in DIMENSIONS},

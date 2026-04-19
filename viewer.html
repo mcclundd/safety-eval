@@ -16,6 +16,8 @@
     --anthropic: #d4a574;
     --openai: #74b9ff;
     --google: #a29bfe;
+    --steered: #ffa657;
+    --default: #7ee787;
     --tag-bg: #21262d;
     --hover: #1c2128;
   }
@@ -78,7 +80,7 @@
     padding: 6px 12px;
     border-radius: 6px;
     font-size: 14px;
-    width: 260px;
+    width: 240px;
     outline: none;
   }
   .toolbar input:focus { border-color: var(--accent); }
@@ -99,12 +101,21 @@
     color: var(--text-muted);
   }
 
+  /* Toggle group label */
+  .toggle-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-right: 2px;
+  }
+
   /* Model toggles */
-  .model-toggles {
+  .model-toggles, .condition-toggles {
     display: flex;
     gap: 6px;
   }
-  .model-toggle {
+  .pill {
     font-size: 12px;
     padding: 4px 10px;
     border-radius: 14px;
@@ -115,20 +126,30 @@
     transition: all 0.15s;
     font-weight: 500;
   }
-  .model-toggle.active[data-model="anthropic"] {
+  .pill.active[data-model="anthropic"] {
     background: #d4a57422;
     border-color: var(--anthropic);
     color: var(--anthropic);
   }
-  .model-toggle.active[data-model="openai"] {
+  .pill.active[data-model="openai"] {
     background: #74b9ff22;
     border-color: var(--openai);
     color: var(--openai);
   }
-  .model-toggle.active[data-model="google"] {
+  .pill.active[data-model="google"] {
     background: #a29bfe22;
     border-color: var(--google);
     color: var(--google);
+  }
+  .pill.active[data-condition="steered"] {
+    background: #ffa65722;
+    border-color: var(--steered);
+    color: var(--steered);
+  }
+  .pill.active[data-condition="default"] {
+    background: #7ee78722;
+    border-color: var(--default);
+    color: var(--default);
   }
 
   /* View toggle */
@@ -156,7 +177,7 @@
   /* Content */
   .content {
     padding: 24px 32px;
-    max-width: 1400px;
+    max-width: 1600px;
   }
 
   /* Card view */
@@ -217,12 +238,25 @@
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 0;
   }
+  /* Split-by-condition layout: 2 cols per model (steered | default), side by side */
+  .responses-split {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 0;
+  }
   .response-card {
     padding: 16px;
     border-right: 1px solid var(--border);
     border-top: 1px solid var(--border);
+    position: relative;
   }
   .response-card:last-child { border-right: none; }
+  .response-card[data-condition="steered"] {
+    border-top: 2px solid var(--steered);
+  }
+  .response-card[data-condition="default"] {
+    border-top: 2px solid var(--default);
+  }
   .response-model {
     font-size: 12px;
     font-weight: 600;
@@ -230,6 +264,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
   }
   .response-model .dot {
     width: 8px;
@@ -241,6 +276,24 @@
   .model-openai .dot { background: var(--openai); }
   .model-google .dot { background: var(--google); }
   .response-model .model-label { color: var(--text-muted); }
+  .condition-tag {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: var(--tag-bg);
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .condition-tag[data-condition="steered"] {
+    background: #ffa65722;
+    color: var(--steered);
+  }
+  .condition-tag[data-condition="default"] {
+    background: #7ee78722;
+    color: var(--default);
+  }
   .response-model .latency {
     font-weight: 400;
     color: var(--text-muted);
@@ -303,29 +356,6 @@
     background: var(--accent-dim);
   }
 
-  /* Quick load buttons */
-  .quick-load {
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  .quick-load button {
-    padding: 8px 16px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--surface);
-    color: var(--text);
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .quick-load button:hover {
-    border-color: var(--accent);
-    background: var(--accent-dim);
-  }
-
   .hidden { display: none !important; }
 
   /* Scrollbar */
@@ -352,7 +382,7 @@
   @media (max-width: 768px) {
     .header, .toolbar, .content { padding-left: 16px; padding-right: 16px; }
     .toolbar input[type="text"] { width: 100%; }
-    .responses-compare { grid-template-columns: 1fr; }
+    .responses-compare, .responses-split { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -366,9 +396,13 @@
 <div class="toolbar hidden" id="toolbar">
   <input type="text" id="search" placeholder="Search queries or responses...">
   <select id="categoryFilter"><option value="">All categories</option></select>
+  <span class="toggle-label">Models</span>
   <div class="model-toggles" id="modelToggles"></div>
+  <span class="toggle-label">Conditions</span>
+  <div class="condition-toggles" id="conditionToggles"></div>
   <div class="view-toggle">
     <button class="view-btn active" data-view="compare" title="Side by side">Compare</button>
+    <button class="view-btn" data-view="split" title="Split by condition (model × condition columns)">Split</button>
     <button class="view-btn" data-view="stacked" title="Stacked">Stacked</button>
   </div>
   <div class="expand-controls">
@@ -395,7 +429,9 @@ const state = {
   activeEval: null,
   models: new Set(),
   categories: new Set(),
+  conditions: new Set(),
   visibleModels: new Set(),
+  visibleConditions: new Set(),
   view: 'compare',
   search: '',
   category: '',
@@ -413,13 +449,17 @@ function inferEvalName(filename, records) {
   const fn = filename.toLowerCase();
   if (fn.includes('humor')) return 'humor-eval';
   if (fn.includes('safety')) return 'safety-eval';
+  if (fn.includes('persona')) return 'persona-eval';
   const cats = new Set(records.map(r => r.category));
   if (cats.has('bit_request') || cats.has('absurd_premise') || cats.has('shower_thought')) return 'humor-eval';
   if (cats.has('ambiguous') || cats.has('passive_ideation') || cats.has('active_ideation')) return 'safety-eval';
+  if (cats.has('copyrighted_character') || cats.has('public_figure') || cats.has('archetype')) return 'persona-eval';
   return filename.replace(/\.[^.]+$/, '');
 }
 
 function loadRecords(name, records) {
+  // Ensure condition field exists on every record (legacy: default to 'steered')
+  records.forEach(r => { if (!r.condition) r.condition = 'steered'; });
   state.evals[name] = records;
   renderEvalBadges();
   if (!state.activeEval) switchEval(name);
@@ -431,7 +471,9 @@ function switchEval(name) {
 
   state.models = new Set(records.map(r => r.model));
   state.categories = new Set(records.map(r => r.category));
+  state.conditions = new Set(records.map(r => r.condition));
   state.visibleModels = new Set(state.models);
+  state.visibleConditions = new Set(state.conditions);
 
   renderEvalBadges();
   renderToolbar();
@@ -467,7 +509,7 @@ function renderToolbar() {
   toggles.innerHTML = '';
   for (const model of state.models) {
     const btn = document.createElement('button');
-    btn.className = 'model-toggle active';
+    btn.className = 'pill active';
     btn.dataset.model = model;
     btn.textContent = modelLabel(model);
     btn.onclick = () => {
@@ -482,6 +524,37 @@ function renderToolbar() {
       renderResponses();
     };
     toggles.appendChild(btn);
+  }
+
+  // Condition toggles
+  const condToggles = document.getElementById('conditionToggles');
+  condToggles.innerHTML = '';
+  const condLabel = document.querySelectorAll('.toggle-label')[1];
+  if (state.conditions.size <= 1) {
+    // Only one condition — hide toggles
+    condToggles.style.display = 'none';
+    if (condLabel) condLabel.style.display = 'none';
+  } else {
+    condToggles.style.display = 'flex';
+    if (condLabel) condLabel.style.display = 'inline';
+    for (const cond of [...state.conditions].sort()) {
+      const btn = document.createElement('button');
+      btn.className = 'pill active';
+      btn.dataset.condition = cond;
+      btn.textContent = cond;
+      btn.onclick = () => {
+        if (state.visibleConditions.has(cond)) {
+          if (state.visibleConditions.size === 1) return;
+          state.visibleConditions.delete(cond);
+          btn.classList.remove('active');
+        } else {
+          state.visibleConditions.add(cond);
+          btn.classList.add('active');
+        }
+        renderResponses();
+      };
+      condToggles.appendChild(btn);
+    }
   }
 }
 
@@ -505,6 +578,7 @@ function renderResponses() {
   const groups = {};
   for (const r of records) {
     if (!state.visibleModels.has(r.model)) continue;
+    if (!state.visibleConditions.has(r.condition)) continue;
     if (cat && r.category !== cat) continue;
     if (search && !r.query.toLowerCase().includes(search) && !r.response.toLowerCase().includes(search)) continue;
     if (!groups[r.query_id]) groups[r.query_id] = { query: r.query, category: r.category, id: r.query_id, responses: [] };
@@ -519,6 +593,21 @@ function renderResponses() {
   for (const group of sorted) {
     const el = document.createElement('div');
     el.className = 'query-group';
+
+    // In 'split' view, sort responses by model, then by condition (steered before default)
+    let ordered = group.responses.slice();
+    if (state.view === 'split') {
+      const condOrder = { steered: 0, default: 1 };
+      ordered.sort((a, b) => {
+        if (a.model !== b.model) return a.model.localeCompare(b.model);
+        return (condOrder[a.condition] ?? 99) - (condOrder[b.condition] ?? 99);
+      });
+    }
+
+    const layoutClass = state.view === 'compare' ? 'responses-compare'
+                      : state.view === 'split'   ? 'responses-split'
+                      : 'responses-stacked';
+
     el.innerHTML = `
       <div class="query-header" onclick="this.parentElement.classList.toggle('open')">
         <span class="query-id">#${group.id}</span>
@@ -527,12 +616,13 @@ function renderResponses() {
         <span class="query-chevron">&#9654;</span>
       </div>
       <div class="responses-container">
-        <div class="responses-${state.view === 'compare' ? 'compare' : 'stacked'}">
-          ${group.responses.map(r => `
-            <div class="response-card model-${r.model}">
+        <div class="${layoutClass}">
+          ${ordered.map(r => `
+            <div class="response-card model-${r.model}" data-condition="${r.condition}">
               <div class="response-model">
                 <span class="dot"></span>
                 <span class="model-label">${modelLabel(r.model)}</span>
+                <span class="condition-tag" data-condition="${r.condition}">${r.condition}</span>
                 <span style="color:var(--text-muted);font-size:11px;font-weight:400">${modelName(r)}</span>
                 ${r.latency_s ? `<span class="latency">${r.latency_s}s</span>` : ''}
               </div>
@@ -545,8 +635,10 @@ function renderResponses() {
     content.appendChild(el);
   }
 
+  const visibleRecords = records.filter(r =>
+    state.visibleModels.has(r.model) && state.visibleConditions.has(r.condition));
   document.getElementById('stats').textContent =
-    `${sorted.length} queries \u00b7 ${records.filter(r => state.visibleModels.has(r.model)).length} responses`;
+    `${sorted.length} queries \u00b7 ${visibleRecords.length} responses`;
 }
 
 function escapeHtml(text) {
